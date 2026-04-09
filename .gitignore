@@ -1,0 +1,5 @@
+saida.xml
+contadores.json
+__pycache__/
+*.pyc
+.claude/
