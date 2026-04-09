@@ -328,5 +328,7 @@ def download():
 
 
 if __name__ == '__main__':
-    print("Acesse: http://localhost:5000")
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    print(f"Acesse: http://localhost:{port}")
+    app.run(debug=debug, host='0.0.0.0', port=port)
