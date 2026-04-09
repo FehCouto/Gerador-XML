@@ -386,7 +386,7 @@
             <div style="font-size:13px; font-weight:600; color:#4a5568; margin-bottom:8px;">Pré-visualização:</div>
             <div class="xml-box" id="xml-box"></div>
             <div class="xml-actions">
-                <a class="btn btn-primary btn-sm" href="/download">⬇ Baixar saida.xml</a>
+                <button class="btn btn-primary btn-sm" onclick="baixarXML()">⬇ Baixar saida.xml</button>
                 <button class="btn btn-neutral btn-sm" onclick="copiarXML()">📋 Copiar XML</button>
             </div>
         </div>
@@ -746,6 +746,20 @@ async function gerarXML() {
 function copiarXML() {
     navigator.clipboard.writeText(document.getElementById('xml-box').textContent)
         .then(() => alert('XML copiado!'));
+}
+
+async function baixarXML() {
+    const xml = document.getElementById('xml-box').textContent;
+    if (!xml) return;
+
+    // Tenta download direto via Blob (funciona local e em produção)
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'saida.xml';
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

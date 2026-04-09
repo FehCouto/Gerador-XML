@@ -1,14 +1,29 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
 import csv
 import os
 import json
 import hashlib
 import random
-from datetime import datetime
 import io
+from datetime import datetime
+
+# PostgreSQL (opcional — usado quando DATABASE_URL está definido)
+try:
+    import psycopg2
+    import psycopg2.extras
+    PSYCOPG2_OK = True
+except ImportError:
+    PSYCOPG2_OK = False
 
 app = Flask(__name__)
 pasta_script = os.path.dirname(os.path.abspath(__file__))
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Railway envia postgres:// mas psycopg2 exige postgresql://
+if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+USA_POSTGRES = bool(DATABASE_URL and PSYCOPG2_OK)
 
 CSV_FIELDS = [
     'numeroGuiaPrestador', 'numeroGuiaOperadora', 'senha',
@@ -30,67 +45,136 @@ CONFIG_PADRAO = {
 COUNTERS_FILE = os.path.join(pasta_script, "contadores.json")
 
 
-# ── Contadores ────────────────────────────────────────────────────────────────
+# ── Banco de dados ────────────────────────────────────────────────────────────
 
-def ler_contadores():
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
+
+
+def init_db():
+    """Cria as tabelas se não existirem."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS contadores (
+                    cnpj VARCHAR(14) PRIMARY KEY,
+                    ultima_guia INTEGER DEFAULT 0
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sequenciais_usados (
+                    cnpj VARCHAR(14) NOT NULL,
+                    sequencial INTEGER NOT NULL,
+                    PRIMARY KEY (cnpj, sequencial)
+                )
+            """)
+        conn.commit()
+
+
+# ── Contadores — PostgreSQL ───────────────────────────────────────────────────
+
+def pg_contadores_cnpj(cnpj):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT ultima_guia FROM contadores WHERE cnpj = %s", (cnpj,))
+            row = cur.fetchone()
+            ultima_guia = row[0] if row else 0
+            cur.execute("SELECT COUNT(*) FROM sequenciais_usados WHERE cnpj = %s", (cnpj,))
+            total_seq = cur.fetchone()[0]
+    return {"sequenciais_usados": total_seq, "ultima_guia": ultima_guia}
+
+
+def pg_gerar_sequencial_unico(cnpj):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT sequencial FROM sequenciais_usados WHERE cnpj = %s", (cnpj,))
+            usados = {r[0] for r in cur.fetchall()}
+            while True:
+                novo = random.randint(100000, 999999)
+                if novo not in usados:
+                    break
+            cur.execute(
+                "INSERT INTO sequenciais_usados (cnpj, sequencial) VALUES (%s, %s)",
+                (cnpj, novo)
+            )
+        conn.commit()
+    return novo
+
+
+def pg_incrementar_guia(cnpj):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO contadores (cnpj, ultima_guia) VALUES (%s, 1)
+                ON CONFLICT (cnpj) DO UPDATE
+                    SET ultima_guia = contadores.ultima_guia + 1
+                RETURNING ultima_guia
+            """, (cnpj,))
+            numero = cur.fetchone()[0]
+        conn.commit()
+    return numero
+
+
+# ── Contadores — Arquivo JSON (fallback local) ────────────────────────────────
+
+def _ler_json():
     if os.path.exists(COUNTERS_FILE):
         with open(COUNTERS_FILE, encoding='utf-8') as f:
             return json.load(f)
     return {}
 
 
-def salvar_contadores(c):
+def _salvar_json(c):
     with open(COUNTERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(c, f, indent=2)
 
 
-def contadores_cnpj(cnpj):
-    """Retorna os contadores do CNPJ (sem modificar)."""
-    c = ler_contadores()
-    return c.get(cnpj, {"sequenciais_usados": [], "ultima_guia": 0})
+def json_contadores_cnpj(cnpj):
+    c = _ler_json()
+    dados = c.get(cnpj, {"sequenciais_usados": [], "ultima_guia": 0})
+    return {
+        "sequenciais_usados": len(dados.get("sequenciais_usados", [])),
+        "ultima_guia": dados.get("ultima_guia", 0)
+    }
 
 
-def gerar_sequencial_unico(cnpj):
-    """Gera um sequencial aleatório de 6 dígitos único para o CNPJ."""
-    c = ler_contadores()
+def json_gerar_sequencial_unico(cnpj):
+    c = _ler_json()
     if cnpj not in c:
         c[cnpj] = {"sequenciais_usados": [], "ultima_guia": 0}
-
     usados = set(c[cnpj].get("sequenciais_usados", []))
     while True:
         novo = random.randint(100000, 999999)
         if novo not in usados:
             usados.add(novo)
             break
-
     c[cnpj]["sequenciais_usados"] = list(usados)
-    salvar_contadores(c)
+    _salvar_json(c)
     return novo
 
 
-def gerar_numero_lote():
-    """Gera um número de lote aleatório de 6 dígitos."""
-    return random.randint(100000, 999999)
-
-
-def incrementar_guia(cnpj):
-    """Incrementa e retorna o próximo número de guia para o CNPJ."""
-    c = ler_contadores()
+def json_incrementar_guia(cnpj):
+    c = _ler_json()
     if cnpj not in c:
         c[cnpj] = {"sequenciais_usados": [], "ultima_guia": 0}
     c[cnpj]["ultima_guia"] += 1
-    salvar_contadores(c)
+    _salvar_json(c)
     return c[cnpj]["ultima_guia"]
 
 
-def atualizar_ultima_guia(cnpj, valor):
-    """Garante que ultima_guia seja ao menos `valor`."""
-    c = ler_contadores()
-    if cnpj not in c:
-        c[cnpj] = {"sequenciais_usados": [], "ultima_guia": 0}
-    if valor > c[cnpj].get("ultima_guia", 0):
-        c[cnpj]["ultima_guia"] = valor
-        salvar_contadores(c)
+# ── Interface unificada ───────────────────────────────────────────────────────
+
+def contadores_cnpj(cnpj):
+    return pg_contadores_cnpj(cnpj) if USA_POSTGRES else json_contadores_cnpj(cnpj)
+
+def gerar_sequencial_unico(cnpj):
+    return pg_gerar_sequencial_unico(cnpj) if USA_POSTGRES else json_gerar_sequencial_unico(cnpj)
+
+def incrementar_guia(cnpj):
+    return pg_incrementar_guia(cnpj) if USA_POSTGRES else json_incrementar_guia(cnpj)
+
+def gerar_numero_lote():
+    return random.randint(100000, 999999)
 
 
 # ── CSV ───────────────────────────────────────────────────────────────────────
@@ -263,10 +347,7 @@ def index():
 def api_contadores():
     cnpj = request.args.get('cnpj', '').strip()
     dados = contadores_cnpj(cnpj)
-    return jsonify({
-        "sequenciais_usados": len(dados.get("sequenciais_usados", [])),
-        "ultima_guia": dados.get("ultima_guia", 0)
-    })
+    return jsonify(dados)
 
 
 @app.route('/api/proximo_guia')
@@ -290,30 +371,32 @@ def gerar():
 
     try:
         cnpj = config['cnpj']
-
-        # sequencialTransacao: aleatório 6 dígitos, único por CNPJ
         sequencial = gerar_sequencial_unico(cnpj)
-
-        # numeroLote: aleatório 6 dígitos (independente)
         numero_lote = gerar_numero_lote()
 
-        # numeroGuiaPrestador espelha numeroGuiaOperadora
         for g in guias:
             g['numeroGuiaPrestador'] = g.get('numeroGuiaOperadora', '')
 
         xml_final = gerar_xml_tiss(config, guias, sequencial, numero_lote)
 
-        caminho_csv = os.path.join(pasta_script, "guias.csv")
-        with open(caminho_csv, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
-            writer.writeheader()
-            writer.writerows(guias)
+        # Salva localmente apenas se não for produção
+        if not USA_POSTGRES:
+            caminho_csv = os.path.join(pasta_script, "guias.csv")
+            with open(caminho_csv, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+                writer.writeheader()
+                writer.writerows(guias)
 
-        saida = os.path.join(pasta_script, "saida.xml")
-        with open(saida, 'w', encoding='utf-8') as f:
-            f.write(xml_final)
+            saida = os.path.join(pasta_script, "saida.xml")
+            with open(saida, 'w', encoding='utf-8') as f:
+                f.write(xml_final)
 
-        return jsonify({'success': True, 'xml': xml_final, 'sequencial': sequencial, 'lote': numero_lote})
+        return jsonify({
+            'success': True,
+            'xml': xml_final,
+            'sequencial': sequencial,
+            'lote': numero_lote
+        })
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -321,14 +404,41 @@ def gerar():
 
 @app.route('/download')
 def download():
+    xml = request.args.get('xml')
+    if xml:
+        # Em produção: retorna o XML recebido via query string não é viável
+        # Usa sessão via POST body no frontend
+        pass
+
     saida = os.path.join(pasta_script, "saida.xml")
     if os.path.exists(saida):
         return send_file(saida, as_attachment=True, download_name='saida.xml', mimetype='application/xml')
     return "Arquivo não encontrado.", 404
 
 
+@app.route('/download', methods=['POST'])
+def download_post():
+    """Download do XML em produção (Railway não tem filesystem persistente)."""
+    xml_content = request.json.get('xml', '')
+    if not xml_content:
+        return "XML não informado.", 400
+    return Response(
+        xml_content,
+        mimetype='application/xml',
+        headers={'Content-Disposition': 'attachment; filename=saida.xml'}
+    )
+
+
+# ── Inicialização ─────────────────────────────────────────────────────────────
+
+if USA_POSTGRES:
+    with app.app_context():
+        init_db()
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') != 'production'
+    modo = "PostgreSQL" if USA_POSTGRES else "arquivo local (contadores.json)"
+    print(f"Storage: {modo}")
     print(f"Acesse: http://localhost:{port}")
     app.run(debug=debug, host='0.0.0.0', port=port)
