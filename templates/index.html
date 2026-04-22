@@ -593,75 +593,46 @@ function removerGuia(id) {
 }
 
 // ── Importar CSV ──────────────────────────────────────────────────────────────
+async function importarPDF(event) {
+    const files = event.target.files;
+    if (!files.length) return;
 
-function importarCSV(input) {
-    const file = input.files[0];
-    if (!file) return;
-    processarArquivoCSV(file);
-    input.value = '';
-}
+    // Mostra um aviso visual que está processando
+    const importZone = document.querySelector('.import-zone');
+    const originalContent = importZone.innerHTML;
+    importZone.innerHTML = "<strong>⏳ Lendo PDFs... Aguarde.</strong>";
 
-function onCsvDrop(event) {
-    event.preventDefault();
-    document.getElementById('import-zone').classList.remove('drag-over');
-    const file = event.dataTransfer.files[0];
-    if (file && file.name.endsWith('.csv')) processarArquivoCSV(file);
-}
+    for (let file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
 
-function processarArquivoCSV(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const text = e.target.result;
-        const linhas = text.trim().split(/\r?\n/);
-        if (linhas.length < 2) return alert('CSV vazio ou sem dados.');
-
-        const header = linhas[0].split(',').map(h => h.trim());
-        const importadas = [];
-
-        for (let i = 1; i < linhas.length; i++) {
-            // Suporta campos com vírgulas dentro de aspas
-            const valores = parseCSVLine(linhas[i]);
-            const guia = {};
-            header.forEach((col, idx) => {
-                guia[col] = (valores[idx] || '').trim();
+        try {
+            const response = await fetch('/extrair-pdf', {
+                method: 'POST',
+                body: formData
             });
+            
+            if (!response.ok) throw new Error('Erro na extração');
+            
+            const dados = await response.json();
 
+            // Adiciona a nova guia ao array global do sistema
             guiaCounter++;
-            // Preenche campos faltantes com default
-            const novaGuia = { _id: guiaCounter };
-            CSV_FIELDS.forEach(f => novaGuia[f] = guia[f] || '');
-            importadas.push(novaGuia);
-        }
-
-        if (importadas.length === 0) return alert('Nenhuma linha válida encontrada.');
-
-        if (guias.length > 0) {
-            if (!confirm(`Importar ${importadas.length} guia(s) do CSV? As guias atuais serão substituídas.`)) return;
-        }
-
-        guias = importadas;
-        renderGuias();
-        alert(`✅ ${importadas.length} guia(s) importada(s) com sucesso!`);
-    };
-    reader.readAsText(file, 'utf-8');
-}
-
-function parseCSVLine(line) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-        if (line[i] === '"') {
-            inQuotes = !inQuotes;
-        } else if (line[i] === ',' && !inQuotes) {
-            result.push(current);
-            current = '';
-        } else {
-            current += line[i];
+            guias.push({ 
+                _id: guiaCounter, 
+                ...dados 
+            });
+            
+        } catch (error) {
+            console.error("Erro ao processar arquivo:", file.name, error);
+            alert("Erro ao ler o arquivo: " + file.name);
         }
     }
-    result.push(current);
-    return result;
+
+    // Volta o texto original e atualiza a tela com as novas guias
+    importZone.innerHTML = originalContent;
+    renderizarGuias();
+    event.target.value = ''; // Limpa o input para permitir re-upload
 }
 
 // ── Gerar XML ─────────────────────────────────────────────────────────────────
