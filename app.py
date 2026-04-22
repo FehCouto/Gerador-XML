@@ -435,6 +435,45 @@ if USA_POSTGRES:
     with app.app_context():
         init_db()
 
+import pdfplumber
+import re
+
+@app.route('/extrair-pdf', methods=['POST'])
+def extrair_pdf():
+    if 'file' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+    
+    file = request.files['file']
+    dados_extraidos = {}
+
+    with pdfplumber.open(file) as pdf:
+        texto_completo = ""
+        for page in pdf.pages:
+            texto_completo += page.extract_text() + "\n"
+
+        # Lógica de extração baseada no seu modelo de PDF
+        def buscar(regra):
+            match = re.search(regra, texto_completo)
+            return match.group(1).strip() if match else ""
+
+        dados_extraidos = {
+            'numeroGuiaOperadora': buscar(r"7- Número da Guia Atribuído\n\s*(\d+)"),
+            'senha': buscar(r"5-Senha\n\s*(\d+)"),
+            'numeroCarteira': buscar(r"8- Número da Carteira\n\s*(\d+)"),
+            'nomeBeneficiario': buscar(r"10-Nome\n\s*([A-Z\s]+)"),
+            'numeroConselho': buscar(r"17- Número no Conselho\n\s*(\d+)"),
+            'dataAutorizacao': buscar(r"4-Data da Autorização\n\s*(\d{2}/\d{2}/\d{4})"),
+            
+            # --- AS SUAS TRAVAS DEFINIDAS ---
+            'conselho': '06',
+            'uf': '35',
+            'cpfProfissional': '99999999999',
+            'horaInicial': '00:00:00',
+            'horaFinal': '00:00:00'
+        }
+
+    return jsonify(dados_extraidos)
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') != 'production'
