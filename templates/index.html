@@ -329,37 +329,15 @@
         </div>
         <div class="card-body">
 
-            <!-- Importar CSV -->
-            <div class="import-zone" id="import-zone"
-                onclick="document.getElementById('csv-file-input').click()"
-                ondragover="event.preventDefault(); this.classList.add('drag-over')"
-                ondragleave="this.classList.remove('drag-over')"
-                ondrop="onCsvDrop(event)">
-                <div style="font-size:28px">📂</div>
-                <strong>Importar CSV</strong>
-                <p>Clique ou arraste um arquivo .csv com as guias</p>
-                <p style="font-size:11px; margin-top:4px; color:#a0aec0">
-                    Colunas: {{ 'numeroGuiaPrestador, numeroGuiaOperadora, senha, ...' }}
-                </p>
-            </div>
-            <input type="file" id="csv-file-input" accept=".csv" onchange="importarCSV(this)">
-
-            <div class="action-bar">
-                <span class="guia-count" id="guia-count">0 guia(s)</span>
-                <div class="action-bar-right">
-                    <button class="btn btn-outline" onclick="adicionarGuia()">＋ Nova Guia</button>
-                </div>
-            </div>
-
-            <div id="guias-container"></div>
-
-            <div id="empty-state" style="text-align:center; padding:40px 20px; color:#a0aec0; display:none;">
-                <div style="font-size:48px; margin-bottom:12px;">📭</div>
-                <p style="font-size:15px; font-weight:600;">Nenhuma guia adicionada</p>
-                <p style="font-size:13px; margin-top:4px;">Clique em "Nova Guia" ou importe um CSV</p>
-            </div>
-        </div>
+            <!-- Importar PDF -->
+<div class="import-zone" onclick="document.getElementById('fileInput').click()">
+    <div class="icon">📄</div>
+    <div>
+        <strong>Importar Guia (PDF)</strong>
+        <p>Clique ou arraste arquivos .pdf com as guias (Múltiplos permitidos)</p>
     </div>
+    <input type="file" id="fileInput" style="display:none" accept=".pdf" multiple onchange="importarPDF(event)">
+</div>
 
     <!-- Gerar XML -->
     <div class="gerar-section">
