@@ -1,0 +1,12 @@
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  numeroGuiaPrestador,numeroGuiaOperadora,senha,dataAutorizacao,dataValidadeSenha,numeroCarteira,nomeBeneficiario,nomeProfissional,conselho,numeroConselho,uf,cbos,dataSolicitacao,dataExecucao,horaInicial,horaFinal,codigoProcedimento,descricaoProcedimento,quantidade,valorUnitario,cpfProfissional,nomeProfExec
+000120260100000001,000120260100000001,00000000000000000001,2026-01-05,2026-03-05,00000000000000001,BENEFICIARIO TESTE,PROFISSIONAL TESTE,CRM,123456,35,225125,2026-01-05,2026-01-05,09:00:00,09:30:00,10101012,CONSULTA EM CONSULTORIO,1,100.00,,PROFISSIONAL TESTE

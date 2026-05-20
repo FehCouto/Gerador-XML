@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador XML TISS</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f4f8;
+            color: #1a202c;
+            min-height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a56db 0%, #0e3a9e 100%);
+            color: white;
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        header .logo { font-size: 28px; }
+        header h1 { font-size: 20px; font-weight: 700; }
+        header p { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 28px 20px 60px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .card-header {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-header h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-body { padding: 24px; }
+
+        /* Contador badge no header */
+        .lote-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #ebf4ff;
+            border: 1.5px solid #bee3f8;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 13px;
+            color: #2b6cb0;
+            font-weight: 600;
+        }
+        .lote-badge span { font-size: 11px; font-weight: 500; color: #4a90d9; }
+
+        /* Form grid */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group.half { grid-column: span 2; }
+
+        label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        input[type="text"], input[type="date"], input[type="time"],
+        input[type="number"], select {
+            border: 1.5px solid #e2e8f0;
+            border-radius: 7px;
+            padding: 9px 12px;
+            font-size: 14px;
+            color: #2d3748;
+            background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            width: 100%;
+            font-family: inherit;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #1a56db;
+            box-shadow: 0 0 0 3px rgba(26,86,219,0.12);
+        }
+        input[readonly] {
+            background: #f7fafc;
+            color: #718096;
+            cursor: default;
+        }
+
+        /* Guia accordion */
+        .guia-item {
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: box-shadow 0.15s;
+        }
+        .guia-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .guia-header {
+            background: #f8fafc;
+            padding: 13px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+        .guia-header:hover { background: #edf2f7; }
+        .guia-header-left { display: flex; align-items: center; gap: 12px; }
+        .guia-badge {
+            background: linear-gradient(135deg, #1a56db, #0e3a9e);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 20px;
+            min-width: 70px;
+            text-align: center;
+        }
+        .guia-title { font-size: 14px; font-weight: 600; color: #2d3748; }
+        .guia-subtitle { font-size: 12px; color: #718096; }
+        .guia-actions { display: flex; align-items: center; gap: 8px; }
+        .guia-body {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            display: none;
+        }
+        .guia-body.open { display: block; }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin: 18px 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #f0f4f8;
+        }
+        .section-title:first-child { margin-top: 0; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            font-family: inherit;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1a56db 0%, #0e3a9e 100%);
+            color: white;
+            box-shadow: 0 2px 6px rgba(26,86,219,0.3);
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,86,219,0.35); }
+        .btn-success {
+            background: linear-gradient(135deg, #0f9d58 0%, #0b7d46 100%);
+            color: white;
+            box-shadow: 0 2px 6px rgba(15,157,88,0.3);
+        }
+        .btn-success:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,157,88,0.35); }
+        .btn-danger { background: #fff5f5; color: #e53e3e; border: 1.5px solid #fed7d7; }
+        .btn-danger:hover { background: #fed7d7; }
+        .btn-outline { background: white; color: #1a56db; border: 1.5px solid #1a56db; }
+        .btn-outline:hover { background: #ebf4ff; }
+        .btn-neutral { background: white; color: #4a5568; border: 1.5px solid #cbd5e0; }
+        .btn-neutral:hover { background: #f7fafc; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-lg { padding: 14px 32px; font-size: 16px; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+        .btn-icon {
+            background: none; border: none; cursor: pointer; padding: 5px;
+            border-radius: 6px; color: #718096; font-size: 16px;
+            display: flex; align-items: center; transition: all 0.15s;
+        }
+        .btn-icon:hover { background: #f0f4f8; color: #e53e3e; }
+
+        /* Action bar */
+        .action-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .action-bar-right { display: flex; gap: 8px; align-items: center; }
+        .guia-count { font-size: 13px; color: #718096; }
+
+        /* CSV Import */
+        .import-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            background: #f8fafc;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: 16px;
+        }
+        .import-zone:hover, .import-zone.drag-over {
+            border-color: #1a56db;
+            background: #ebf4ff;
+        }
+        .import-zone p { font-size: 13px; color: #718096; margin-top: 6px; }
+        .import-zone strong { font-size: 14px; color: #4a5568; }
+        #csv-file-input { display: none; }
+
+        /* Gerar section */
+        .gerar-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+            padding: 28px;
+            text-align: center;
+        }
+
+        .alert {
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .alert.show { display: flex; align-items: flex-start; gap: 10px; }
+        .alert-success { background: #f0fff4; color: #276749; border: 1.5px solid #9ae6b4; }
+        .alert-error { background: #fff5f5; color: #9b2c2c; border: 1.5px solid #feb2b2; }
+
+        .xml-preview { display: none; margin-top: 20px; text-align: left; }
+        .xml-preview.show { display: block; }
+        .xml-box {
+            background: #1a202c; color: #68d391;
+            padding: 16px; border-radius: 8px;
+            font-family: 'Courier New', monospace; font-size: 12px;
+            max-height: 260px; overflow-y: auto; white-space: pre; line-height: 1.6;
+        }
+        .xml-actions { display: flex; gap: 10px; margin-top: 12px; }
+
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .chevron-icon { transition: transform 0.2s; }
+        .chevron-icon.open { transform: rotate(180deg); }
+
+        @media (max-width: 640px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .form-group.half { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">📋</div>
+    <div>
+        <h1>Gerador XML TISS</h1>
+        <p>Padrão ANS 3.03.01 — SP-SADT</p>
+    </div>
+</header>
+
+<main>
+
+    <!-- Configurações do Prestador -->
+    <div class="card">
+        <div class="card-header">
+            <h2>🏥 Configurações do Prestador</h2>
+            <div class="lote-badge">
+                <span>Sequenciais usados neste CNPJ:</span>
+                <strong id="proximo-lote">—</strong>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>CNPJ</label>
+                    <input type="text" id="cnpj" value="{{ config.cnpj }}" maxlength="14"
+                        placeholder="00000000000000" oninput="onCnpjChange()">
+                </div>
+                <div class="form-group">
+                    <label>Registro ANS</label>
+                    <input type="text" id="reg_ans" value="{{ config.reg_ans }}" maxlength="6">
+                </div>
+                <div class="form-group">
+                    <label>CNES</label>
+                    <input type="text" id="cnes" value="{{ config.cnes }}" maxlength="7">
+                </div>
+                <div class="form-group half">
+                    <label>Nome do Prestador</label>
+                    <input type="text" id="nome_prestador" value="{{ config.nome_prestador }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guias -->
+    <div class="card">
+        <div class="card-header">
+            <h2>📄 Guias SP-SADT</h2>
+        </div>
+        <div class="card-body">
+
+            <!-- Importar CSV -->
+            <div class="import-zone" id="import-zone"
+                onclick="document.getElementById('csv-file-input').click()"
+                ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                ondragleave="this.classList.remove('drag-over')"
+                ondrop="onCsvDrop(event)">
+                <div style="font-size:28px">📂</div>
+                <strong>Importar CSV</strong>
+                <p>Clique ou arraste um arquivo .csv com as guias</p>
+                <p style="font-size:11px; margin-top:4px; color:#a0aec0">
+                    Colunas: {{ 'numeroGuiaPrestador, numeroGuiaOperadora, senha, ...' }}
+                </p>
+            </div>
+            <input type="file" id="csv-file-input" accept=".csv" onchange="importarCSV(this)">
+
+            <div class="action-bar">
+                <span class="guia-count" id="guia-count">0 guia(s)</span>
+                <div class="action-bar-right">
+                    <button class="btn btn-outline" onclick="adicionarGuia()">＋ Nova Guia</button>
+                </div>
+            </div>
+
+            <div id="guias-container"></div>
+
+            <div id="empty-state" style="text-align:center; padding:40px 20px; color:#a0aec0; display:none;">
+                <div style="font-size:48px; margin-bottom:12px;">📭</div>
+                <p style="font-size:15px; font-weight:600;">Nenhuma guia adicionada</p>
+                <p style="font-size:13px; margin-top:4px;">Clique em "Nova Guia" ou importe um CSV</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gerar XML -->
+    <div class="gerar-section">
+        <button class="btn btn-success btn-lg" id="btn-gerar" onclick="gerarXML()">
+            ⚡ Gerar XML TISS
+        </button>
+
+        <div class="alert alert-success" id="alert-success">
+            <span>✅</span>
+            <div>
+                <strong>XML gerado com sucesso!</strong>
+                <div style="margin-top:4px; font-size:13px;">
+                    Lote/Sequencial: <strong id="lote-gerado">—</strong> &nbsp;·&nbsp;
+                    Arquivo <code>saida.xml</code> salvo na pasta do projeto.
+                </div>
+            </div>
+        </div>
+        <div class="alert alert-error" id="alert-error">
+            <span>❌</span>
+            <div id="error-msg">Erro ao gerar XML.</div>
+        </div>
+
+        <div class="xml-preview" id="xml-preview">
+            <div style="font-size:13px; font-weight:600; color:#4a5568; margin-bottom:8px;">Pré-visualização:</div>
+            <div class="xml-box" id="xml-box"></div>
+            <div class="xml-actions">
+                <button class="btn btn-primary btn-sm" onclick="baixarXML()">⬇ Baixar saida.xml</button>
+                <button class="btn btn-neutral btn-sm" onclick="copiarXML()">📋 Copiar XML</button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+let guias = [];
+let guiaCounter = 0;
+
+const guiasIniciais = {{ guias | tojson }};
+
+const CSV_FIELDS = [
+    'numeroGuiaPrestador','numeroGuiaOperadora','senha','dataAutorizacao','dataValidadeSenha',
+    'numeroCarteira','nomeBeneficiario','nomeProfissional','conselho','numeroConselho','uf','cbos',
+    'dataSolicitacao','dataExecucao','horaInicial','horaFinal','codigoProcedimento',
+    'descricaoProcedimento','quantidade','valorUnitario','cpfProfissional','nomeProfExec'
+];
+
+const secoes = [
+    {
+        titulo: '📋 Identificação da Guia',
+        campos: [
+            { key: 'numeroGuiaOperadora', label: 'Nº Guia Operadora', type: 'text', span: 2 },
+        ]
+    },
+    {
+        titulo: '🔐 Autorização',
+        campos: [
+            { key: 'senha', label: 'Senha', type: 'text' },
+            { key: 'dataAutorizacao', label: 'Data Autorização', type: 'date' },
+            { key: 'dataValidadeSenha', label: 'Validade da Senha', type: 'date' },
+        ]
+    },
+    {
+        titulo: '👤 Beneficiário',
+        campos: [
+            { key: 'numeroCarteira', label: 'Nº Carteira', type: 'text' },
+            { key: 'nomeBeneficiario', label: 'Nome do Beneficiário', type: 'text', span: 2 },
+        ]
+    },
+    {
+        titulo: '👨‍⚕️ Profissional',
+        campos: [
+            { key: 'nomeProfissional', label: 'Nome do Profissional', type: 'text', span: 2 },
+            { key: 'conselho', label: 'Conselho', type: 'text' },
+            { key: 'numeroConselho', label: 'Nº Conselho', type: 'text' },
+            { key: 'uf', label: 'UF', type: 'text', maxlength: 2 },
+            { key: 'cbos', label: 'CBOS', type: 'text' },
+            { key: 'cpfProfissional', label: 'CPF Profissional', type: 'text', maxlength: 11 },
+            { key: 'nomeProfExec', label: 'Nome Prof. Executante', type: 'text', span: 2 },
+        ]
+    },
+    {
+        titulo: '📅 Datas e Horários',
+        campos: [
+            { key: 'dataSolicitacao', label: 'Data Solicitação', type: 'date' },
+            { key: 'dataExecucao', label: 'Data Execução', type: 'date' },
+            { key: 'horaInicial', label: 'Hora Inicial', type: 'time' },
+            { key: 'horaFinal', label: 'Hora Final', type: 'time' },
+        ]
+    },
+    {
+        titulo: '🏥 Procedimento',
+        campos: [
+            { key: 'codigoProcedimento', label: 'Código Procedimento', type: 'text' },
+            { key: 'descricaoProcedimento', label: 'Descrição', type: 'text', span: 3 },
+            { key: 'quantidade', label: 'Quantidade', type: 'number' },
+            { key: 'valorUnitario', label: 'Valor Unitário (R$)', type: 'number', step: '0.01' },
+        ]
+    }
+];
+
+// ── Contadores ────────────────────────────────────────────────────────────────
+
+async function carregarContadores() {
+    const cnpj = document.getElementById('cnpj').value.trim();
+    if (!cnpj) return;
+    try {
+        const resp = await fetch(`/api/contadores?cnpj=${cnpj}`);
+        const data = await resp.json();
+        document.getElementById('proximo-lote').textContent = data.sequenciais_usados ?? 0;
+    } catch(e) {}
+}
+
+function onCnpjChange() {
+    carregarContadores();
+}
+
+// ── Renderização das guias ────────────────────────────────────────────────────
+
+function criarFormGuia(dados, id) {
+    let html = '';
+    for (const secao of secoes) {
+        html += `<div class="section-title">${secao.titulo}</div><div class="form-grid">`;
+        for (const campo of secoes[secoes.indexOf(secao)].campos) {
+            const spanClass = campo.span ? ' half' : '';
+            const val = (dados[campo.key] || '').toString().replace(/"/g, '&quot;');
+            const maxlen = campo.maxlength ? `maxlength="${campo.maxlength}"` : '';
+            const step = campo.step ? `step="${campo.step}"` : '';
+            html += `
+            <div class="form-group${spanClass}">
+                <label>${campo.label}</label>
+                <input type="${campo.type}" data-id="${id}" data-key="${campo.key}"
+                    value="${val}" ${maxlen} ${step}
+                    oninput="atualizarCampo(${id}, '${campo.key}', this.value)">
+            </div>`;
+        }
+        html += `</div>`;
+    }
+    return html;
+}
+
+function renderGuias() {
+    const container = document.getElementById('guias-container');
+    const emptyState = document.getElementById('empty-state');
+    document.getElementById('guia-count').textContent = `${guias.length} guia(s)`;
+
+    if (guias.length === 0) {
+        container.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+    }
+    emptyState.style.display = 'none';
+
+    const abertos = {};
+    container.querySelectorAll('.guia-body.open').forEach(el => {
+        abertos[el.dataset.guiaId] = true;
+    });
+
+    container.innerHTML = '';
+    guias.forEach((guia, idx) => {
+        const id = guia._id;
+        const isOpen = abertos[id] || guias.length === 1;
+        const nome = guia.nomeBeneficiario || '—';
+        const numGuia = guia.numeroGuiaPrestador || '—';
+        const div = document.createElement('div');
+        div.className = 'guia-item';
+        div.innerHTML = `
+            <div class="guia-header" onclick="toggleGuia(${id})">
+                <div class="guia-header-left">
+                    <span class="guia-badge">Guia ${String(idx + 1).padStart(2,'0')}</span>
+                    <div>
+                        <div class="guia-title">${nome}</div>
+                        <div class="guia-subtitle">Nº Prestador: ${numGuia}</div>
+                    </div>
+                </div>
+                <div class="guia-actions">
+                    <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); removerGuia(${id})">🗑 Remover</button>
+                    <button class="btn-icon" style="pointer-events:none">
+                        <span class="chevron-icon ${isOpen ? 'open' : ''}">▾</span>
+                    </button>
+                </div>
+            </div>
+            <div class="guia-body ${isOpen ? 'open' : ''}" data-guia-id="${id}">
+                ${criarFormGuia(guia, id)}
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function toggleGuia(id) {
+    const body = document.querySelector(`.guia-body[data-guia-id="${id}"]`);
+    const chevron = body.previousElementSibling.querySelector('.chevron-icon');
+    body.classList.toggle('open');
+    chevron.classList.toggle('open');
+}
+
+function atualizarCampo(id, key, value) {
+    const guia = guias.find(g => g._id === id);
+    if (!guia) return;
+    guia[key] = value;
+    const idx = guias.indexOf(guia);
+    const item = document.querySelectorAll('.guia-item')[idx];
+    if (item) {
+        if (key === 'nomeBeneficiario') item.querySelector('.guia-title').textContent = value || '—';
+        if (key === 'numeroGuiaPrestador') item.querySelector('.guia-subtitle').textContent = `Nº Prestador: ${value || '—'}`;
+    }
+}
+
+// ── Adicionar / Remover guias ─────────────────────────────────────────────────
+
+async function adicionarGuia() {
+    const cnpj = document.getElementById('cnpj').value.trim();
+    let numeroFormatado = '';
+
+    try {
+        const resp = await fetch(`/api/proximo_guia?cnpj=${cnpj}`);
+        const data = await resp.json();
+        numeroFormatado = data.formatado;
+        document.getElementById('proximo-lote').textContent = (parseInt(document.getElementById('proximo-lote').textContent) || 1);
+    } catch(e) {
+        // fallback: incrementa localmente
+        const maxNum = guias.reduce((m, g) => Math.max(m, parseInt(g.numeroGuiaPrestador) || 0), 0);
+        numeroFormatado = String(maxNum + 1).padStart(4, '0');
+    }
+
+    guiaCounter++;
+    const hoje = new Date().toISOString().split('T')[0];
+    const novaGuia = {
+        _id: guiaCounter,
+        numeroGuiaPrestador: numeroFormatado,
+        numeroGuiaOperadora: '', senha: '',
+        dataAutorizacao: hoje, dataValidadeSenha: '',
+        numeroCarteira: '', nomeBeneficiario: '',
+        nomeProfissional: '', conselho: '', numeroConselho: '',
+        uf: '', cbos: '', dataSolicitacao: hoje,
+        dataExecucao: hoje, horaInicial: '00:00', horaFinal: '00:00',
+        codigoProcedimento: '', descricaoProcedimento: '',
+        quantidade: '1', valorUnitario: '', cpfProfissional: '', nomeProfExec: ''
+    };
+    guias.push(novaGuia);
+    renderGuias();
+    setTimeout(() => {
+        const items = document.querySelectorAll('.guia-item');
+        if (items.length) items[items.length-1].scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 50);
+}
+
+function removerGuia(id) {
+    if (!confirm('Remover esta guia?')) return;
+    guias = guias.filter(g => g._id !== id);
+    renderGuias();
+}
+
+// ── Importar CSV ──────────────────────────────────────────────────────────────
+
+function importarCSV(input) {
+    const file = input.files[0];
+    if (!file) return;
+    processarArquivoCSV(file);
+    input.value = '';
+}
+
+function onCsvDrop(event) {
+    event.preventDefault();
+    document.getElementById('import-zone').classList.remove('drag-over');
+    const file = event.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) processarArquivoCSV(file);
+}
+
+function processarArquivoCSV(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target.result;
+        const linhas = text.trim().split(/\r?\n/);
+        if (linhas.length < 2) return alert('CSV vazio ou sem dados.');
+
+        const header = linhas[0].split(',').map(h => h.trim());
+        const importadas = [];
+
+        for (let i = 1; i < linhas.length; i++) {
+            // Suporta campos com vírgulas dentro de aspas
+            const valores = parseCSVLine(linhas[i]);
+            const guia = {};
+            header.forEach((col, idx) => {
+                guia[col] = (valores[idx] || '').trim();
+            });
+
+            guiaCounter++;
+            // Preenche campos faltantes com default
+            const novaGuia = { _id: guiaCounter };
+            CSV_FIELDS.forEach(f => novaGuia[f] = guia[f] || '');
+            importadas.push(novaGuia);
+        }
+
+        if (importadas.length === 0) return alert('Nenhuma linha válida encontrada.');
+
+        if (guias.length > 0) {
+            if (!confirm(`Importar ${importadas.length} guia(s) do CSV? As guias atuais serão substituídas.`)) return;
+        }
+
+        guias = importadas;
+        renderGuias();
+        alert(`✅ ${importadas.length} guia(s) importada(s) com sucesso!`);
+    };
+    reader.readAsText(file, 'utf-8');
+}
+
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        if (line[i] === '"') {
+            inQuotes = !inQuotes;
+        } else if (line[i] === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += line[i];
+        }
+    }
+    result.push(current);
+    return result;
+}
+
+// ── Gerar XML ─────────────────────────────────────────────────────────────────
+
+async function gerarXML() {
+    const btn = document.getElementById('btn-gerar');
+    const alertSuccess = document.getElementById('alert-success');
+    const alertError = document.getElementById('alert-error');
+    const xmlPreview = document.getElementById('xml-preview');
+
+    alertSuccess.classList.remove('show');
+    alertError.classList.remove('show');
+    xmlPreview.classList.remove('show');
+
+    if (guias.length === 0) {
+        document.getElementById('error-msg').textContent = 'Adicione pelo menos uma guia antes de gerar o XML.';
+        alertError.classList.add('show');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Gerando...';
+
+    const config = {
+        cnpj: document.getElementById('cnpj').value,
+        reg_ans: document.getElementById('reg_ans').value,
+        cnes: document.getElementById('cnes').value,
+        nome_prestador: document.getElementById('nome_prestador').value,
+    };
+
+    const guiasLimpas = guias.map(({ _id, ...rest }) => rest);
+
+    try {
+        const resp = await fetch('/gerar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ config, guias: guiasLimpas })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            alertSuccess.classList.add('show');
+            document.getElementById('lote-gerado').textContent = `Seq: ${data.sequencial} / Lote: ${data.lote}`;
+            await carregarContadores();
+            document.getElementById('xml-box').textContent = data.xml;
+            xmlPreview.classList.add('show');
+        } else {
+            document.getElementById('error-msg').textContent = data.error || 'Erro desconhecido.';
+            alertError.classList.add('show');
+        }
+    } catch (e) {
+        document.getElementById('error-msg').textContent = 'Erro de conexão: ' + e.message;
+        alertError.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '⚡ Gerar XML TISS';
+    }
+}
+
+function copiarXML() {
+    navigator.clipboard.writeText(document.getElementById('xml-box').textContent)
+        .then(() => alert('XML copiado!'));
+}
+
+async function baixarXML() {
+    const xml = document.getElementById('xml-box').textContent;
+    if (!xml) return;
+
+    // Tenta download direto via Blob (funciona local e em produção)
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'saida.xml';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+window.addEventListener('DOMContentLoaded', () => {
+    guiasIniciais.forEach(g => {
+        guiaCounter++;
+        guias.push({ _id: guiaCounter, ...g });
+    });
+    renderGuias();
+    carregarContadores();
+});
+</script>
+
+</body>
+</html>
